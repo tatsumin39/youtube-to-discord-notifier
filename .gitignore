@@ -1,0 +1,8 @@
+# macOS 生成の隠しファイル
+.DS_Store
+
+# clasp プロジェクトファイル
+.clasp.json
+
+# Google Apps Script の設定ファイル
+appsscript.json
