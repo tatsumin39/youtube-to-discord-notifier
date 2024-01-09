@@ -213,43 +213,6 @@ function processChannelFeed(channelName, channelId, channels, channelIcon) {
       }
     }    
   }
-  
-  for (let i = 0; i < items.length; i++) {
-    const feedTitle = items[i].getChildText('title', atom);
-    const feedUpdated = formatDate(items[i].getChildText('updated', atom));
-    const feedPublished = formatDate(items[i].getChildText('published', atom));
-    const feedVideoId = items[i].getChildText('videoId', youtubeNamespace);
-    const [isNewVideo, liveBroadcastContent, scheduledStartTime, actualStartTime] = getVideoInfoFromSheet(globalSheetData, feedVideoId);
-
-    if (isNewVideo) {
-      let formattedScheduledStartTime = scheduledStartTime ? formatDate(scheduledStartTime) : '';
-      let formattedActualStartTime = actualStartTime ? formatDate(actualStartTime) : '';
-      let APILiveBroadcastContent = liveBroadcastContent;
-
-      newVideoDataRows.push([
-        feedTitle, 
-        feedPublished, 
-        feedUpdated, 
-        feedVideoId, 
-        channel, 
-        APILiveBroadcastContent, 
-        formattedScheduledStartTime, 
-        formattedActualStartTime
-      ]);
-
-      postToDiscord({
-        channel: channel,
-        title: feedTitle,
-        videoId: feedVideoId,
-        description_text: description_text(liveBroadcastContent, formattedActualStartTime || formattedScheduledStartTime)
-      }, channelIcon);
-    } else {
-      let SheetLiveBroadcastContent = liveBroadcastContent;
-      const data = [feedTitle, feedPublished, feedUpdated, feedVideoId, channel, SheetLiveBroadcastContent, scheduledStartTime ? scheduledStartTime : ''];
-      
-      updateChecker(data, channelIcon);
-    }
-  }
 
   if (newVideoDataRows.length > 0) {
     videoDataSheet.getRange(videoDataSheet.getLastRow() + 1, 1, newVideoDataRows.length, newVideoDataRows[0].length).setValues(newVideoDataRows);
