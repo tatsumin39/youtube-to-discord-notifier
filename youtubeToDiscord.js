@@ -160,12 +160,60 @@ function processChannelFeed(channelName, channelId, channels, channelIcon) {
   const channel = channelArray[0];
   const videoDataSheet = spreadsheet.getSheetByName('videoData');
   const channelRssUrl = youtubeRssUrlPrefix + channelId;
-  const xml = UrlFetchApp.fetch(channelRssUrl).getContentText();
-  const docs = XmlService.parse(xml);
-  const root = docs.getRootElement();
-  const items = root.getChildren('entry', atom).slice(0, 5);
+  let items;
+
+  try {
+    const xml = UrlFetchApp.fetch(channelRssUrl).getContentText();
+    const docs = XmlService.parse(xml);
+    const root = docs.getRootElement();
+    items = root.getChildren('entry', atom).slice(0, 5);
+  } catch (e) {
+    Logger.log("エラーが発生しました: " + e.message);
+    // エラーが発生した場合の処理をここに記述...
+    return false; // または必要に応じて他の処理を行う
+  }
+  
   let newVideoDataRows = [];
 
+  if (items){
+    for (let i = 0; i < items.length; i++) {
+      const feedTitle = items[i].getChildText('title', atom);
+      const feedUpdated = formatDate(items[i].getChildText('updated', atom));
+      const feedPublished = formatDate(items[i].getChildText('published', atom));
+      const feedVideoId = items[i].getChildText('videoId', youtubeNamespace);
+      const [isNewVideo, liveBroadcastContent, scheduledStartTime, actualStartTime] = getVideoInfoFromSheet(globalSheetData, feedVideoId);
+  
+      if (isNewVideo) {
+        let formattedScheduledStartTime = scheduledStartTime ? formatDate(scheduledStartTime) : '';
+        let formattedActualStartTime = actualStartTime ? formatDate(actualStartTime) : '';
+        let APILiveBroadcastContent = liveBroadcastContent;
+  
+        newVideoDataRows.push([
+          feedTitle, 
+          feedPublished, 
+          feedUpdated, 
+          feedVideoId, 
+          channel, 
+          APILiveBroadcastContent, 
+          formattedScheduledStartTime, 
+          formattedActualStartTime
+        ]);
+  
+        postToDiscord({
+          channel: channel,
+          title: feedTitle,
+          videoId: feedVideoId,
+          description_text: description_text(liveBroadcastContent, formattedActualStartTime || formattedScheduledStartTime)
+        }, channelIcon);
+      } else {
+        let SheetLiveBroadcastContent = liveBroadcastContent;
+        const data = [feedTitle, feedPublished, feedUpdated, feedVideoId, channel, SheetLiveBroadcastContent, scheduledStartTime ? scheduledStartTime : ''];
+        
+        updateChecker(data, channelIcon);
+      }
+    }    
+  }
+  
   for (let i = 0; i < items.length; i++) {
     const feedTitle = items[i].getChildText('title', atom);
     const feedUpdated = formatDate(items[i].getChildText('updated', atom));
