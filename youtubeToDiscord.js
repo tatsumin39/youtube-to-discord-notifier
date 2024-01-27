@@ -161,11 +161,12 @@ function loadAndVerifyChannelData() {
     const row = getSpreadsheetData(channelsSheet, `${i}:${i}`)[0];
     const channelId = row[1];
     const channelIconUrl = row[2];
+    const discordChannelId = row[3];
     
     if (!isUrlAccessible(channelIconUrl)) {
       const updatedIconUrl = updateChannelIcon(channelId);
       channelsSheet.getRange(i, 3).setValue(updatedIconUrl);
-      channelsData.push([row[0], channelId, updatedIconUrl]);
+      channelsData.push([row[0], channelId, updatedIconUrl, discordChannelId]);
     } else {
       channelsData.push(row);
     }
@@ -176,7 +177,7 @@ function loadAndVerifyChannelData() {
 }
 
 // チャンネルの更新とフィード取得を処理するメイン関数
-function processChannelFeed(channelName, channelId, channels, channelIcon) {
+function processChannelFeed(channelName, channelId, channels, channelIcon, discordChannelId) {
   console.log(`処理を開始: チャンネル名 ${channelName}`);
   let return_info = false;
   let channelArray = channels.find(channelArray => channelArray[1] === channelId);
@@ -197,7 +198,6 @@ function processChannelFeed(channelName, channelId, channels, channelIcon) {
     items = root.getChildren('entry', atom).slice(0, 5);
   } catch (e) {
     Logger.log("エラーが発生しました: " + e.message);
-    // エラーが発生した場合の処理をここに記述...
     return false; // または必要に応じて他の処理を行う
   }
   
@@ -233,12 +233,12 @@ function processChannelFeed(channelName, channelId, channels, channelIcon) {
           title: feedTitle,
           videoId: feedVideoId,
           description_text: description_text(liveBroadcastContent, formattedActualStartTime || formattedScheduledStartTime, convertedDuration)
-        }, channelIcon);
+        }, channelIcon, discordChannelId);
       } else {
         let SheetLiveBroadcastContent = liveBroadcastContent;
         const data = [feedTitle, feedPublished, feedUpdated, feedVideoId, channel, SheetLiveBroadcastContent, scheduledStartTime ? scheduledStartTime : ''];
         
-        updateChecker(data, channelIcon);
+        updateChecker(data, channelIcon, discordChannelId);
       }
     }    
   }
@@ -257,7 +257,8 @@ function updateAllChannels() {
     const channelName = channelArray[0];
     const channelId = channelArray[1];
     const channelIcon = getChannelIcon(channelId);
-    update = processChannelFeed(channelName, channelId, channels, channelIcon) || update;
+    const discordChannelId = channelArray[3];
+    update = processChannelFeed(channelName, channelId, channels, channelIcon, discordChannelId) || update;
   });
   console.log('completed!');
 }
@@ -374,7 +375,7 @@ function updateVideoInfoInSheet(title, feedPublished, feedUpdated, videoId, apiL
 }
 
 // ビデオ情報の更新を確認し、必要に応じてDiscordに投稿する関数
-function updateChecker(data, channelIcon) {
+function updateChecker(data, channelIcon, discordChannelId) {
   const [feedTitle, feedPublished, feedUpdated, feedVideoId, channel, sheetLiveBroadcastContent, sheetScheduledStartTime, sheetActualStartTime] = data;
   
   if (sheetLiveBroadcastContent == 'upcoming' || sheetLiveBroadcastContent == 'live') {
@@ -430,7 +431,7 @@ function updateChecker(data, channelIcon) {
             title: apiTitle,
             videoId: feedVideoId,
             description_text: description
-          }, channelIcon);
+          }, channelIcon, discordChannelId);
           Utilities.sleep(400);
         }
       } else {
@@ -444,25 +445,32 @@ function updateChecker(data, channelIcon) {
 }
 
 // Discordにメッセージを投稿する関数
-function postToDiscord(data, channelIcon) {
-  const type = 'application/json'
-  const discordWebhookUrl = PropertiesService.getScriptProperties().getProperty('discordWebhookUrl');
+function postToDiscord(data, channelIcon, discordChannelId) {
+  const type = 'application/json';
+  // discordChannelIdが提供されているかチェックし、適切なWebhook URLを取得
+  let discordWebhookUrl;
+  if (discordChannelId && discordChannelId.trim() !== '') {
+    discordWebhookUrl = PropertiesService.getScriptProperties().getProperty(discordChannelId);
+  } else {
+    // ここでデフォルトのDiscord Webhook URLのプロパティ名を指定
+    discordWebhookUrl = PropertiesService.getScriptProperties().getProperty('discordWebhookUrl');
+  }
   const youtube_url = 'https://www.youtube.com/watch?v='
 
-  var message ={
+  var message = {
     username: data.channel,
     avatar_url: channelIcon || "https://www.youtube.com/s/desktop/28b0985e/img/favicon_144x144.png",
     tts: false,
     title: data.title,
     content: `[${data.description_text}](${youtube_url}${data.videoId})`,
   }
-  var options ={
+  var options = {
     'method' : 'post',
     'contentType': type,
     'payload': JSON.stringify(message),
   }
-  try{
-    UrlFetchApp.fetch(discordWebhookUrl, options)
+  try {
+    UrlFetchApp.fetch(discordWebhookUrl, options);
   } catch(e) {
     console.error(`エラーが発生しました - 関数名: ${e.functionName}, エラーメッセージ: ${e.message}`);
   }

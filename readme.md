@@ -11,6 +11,15 @@ English follows Japanese.
 - 新しい動画がある場合、Discordに通知を送信
 - チャンネルのアイコンURL更新機能
 
+#### オプション機能：複数のDiscordチャンネルに通知を送信
+
+この機能を使用すると、複数のDiscordチャンネルに通知を行うことができます。スプレッドシートの「channels」シートに新たな列 `discordChannelId` を追加して、各YouTubeチャンネルに対応するDiscordチャンネルの識別子を記入します。
+
+- `discordChannelId` 列は任意であり、この列が空の場合はGoogle Apps Scriptのセットアップの2. のプロパティ名: `discordWebhookUrl`のDiscord Webhook URLが使用されます。
+- 特定のDiscordチャンネルのWebhook URLは、スクリプトの `PropertiesService` に登録する必要があります。
+
+この機能により、異なるYouTubeチャンネルに対して異なるDiscordチャンネルに通知を送ることができるようになり、より柔軟な通知システムを実現できます。
+
 ## 使い方
 ### Discord Webhookの設定
 1. Discordで、通知を送信したいチャンネルを選択します。
@@ -20,7 +29,7 @@ English follows Japanese.
 
 ### Googleスプレッドシートの準備
 1. 新しいGoogleスプレッドシートを作成し、「channels」と「videoData」の2つのシートを準備します。
-   - 「channels」シートで見出し行として、`CHANNEL_NAME`、`CHANNEL_ID`、`CHANNEL_ICON_URL`を設定します。
+   - 「channels」シートで見出し行として、`CHANNEL_NAME`、`CHANNEL_ID`、`CHANNEL_ICON_URL`、`discordChannelId`を設定します。
    - 「videoData」シートで見出し行として、`title`、`published`、`updated`、`videoId`、`channel`、`live`、`scheduledStartTime`、`actualStartTime`、`duration`を設定します。
 
 ### Google Apps Scriptのセットアップ
@@ -39,6 +48,13 @@ English follows Japanese.
 1. Apps Scriptの「トリガー」メニューから、新しいトリガーを追加します。
 2. 「実行する関数」で `fetchUpdateAndNotify` を選択します。
 3. 「時間主導型」トリガーを選択し、実行間隔を「5分おき」に設定します。
+
+#### オプション機能用の追加設定
+
+オプション機能「複数のDiscordチャンネルに通知を送信する機能」を使用する場合、各Discordチャンネルに対応するWebhook URLをスクリプト プロパティに追加する必要があります。以下のように設定してください：
+
+- `discordWebhookUrl` はデフォルトのDiscord Webhook URLを指定します。これは、`discordChannelId` 列が空の場合に使用されます。
+- 各特定のDiscordチャンネルのWebhook URLは、それぞれ異なるプロパティ名で追加します。例えば、特定のチャンネルの識別子が `myDiscordChannel` の場合、そのプロパティ名を `myDiscordChannel` とし、値にはそのチャンネルのWebhook URLを設定します。
 
 ## 注意事項および留意事項
 
@@ -65,6 +81,15 @@ This Google Apps Script (GAS) allows you to notify a Discord channel about new v
 - Saves the obtained video information to a Google Spreadsheet
 - Sends notifications to Discord when new videos are available
 - Updates channel icon URL functionality
+
+#### Optional Feature: Sending Notifications to Multiple Discord Channels
+
+By using this feature, you can send notifications to multiple Discord channels. Add a new column `discordChannelId` to the 'channels' sheet in the spreadsheet and enter the identifiers for the Discord channels corresponding to each YouTube channel.
+
+- The `discordChannelId` column is optional, and if this column is empty, the Discord Webhook URL specified in 'Property name: `discordWebhookUrl`' under Google Apps Script Setup, point 2, will be used.
+- The Webhook URL for each specific Discord channel needs to be registered in the script's `PropertiesService`.
+
+This feature allows you to send notifications to different Discord channels for different YouTube channels, enabling a more flexible notification system.
 
 ### How to Use
 #### Setting Up Discord Webhook
@@ -95,6 +120,13 @@ This Google Apps Script (GAS) allows you to notify a Discord channel about new v
 2. Select `fetchUpdateAndNotify` for 'Choose which function to run'.
 3. Choose 'Time-driven' trigger and set the execution interval to 'Every 5 minutes'.
 
+#### Additional Settings for the Optional Feature
+
+When using the optional feature 'Sending Notifications to Multiple Discord Channels', you need to add the Webhook URL for each Discord channel to the script properties. Set it up as follows:
+
+- `discordWebhookUrl` specifies the default Discord Webhook URL, which is used when the `discordChannelId` column is empty.
+- The Webhook URL for each specific Discord channel should be added with a different property name. For example, if the identifier for a specific channel is `myDiscordChannel`, set the property name to `myDiscordChannel` and specify that channel's Webhook URL as its value.
+
 ### Notes and Considerations
 
 #### Real-time Notifications
@@ -106,9 +138,6 @@ This Google Apps Script (GAS) allows you to notify a Discord channel about new v
 
 #### Handling Scheduled Broadcasts
 - If a scheduled broadcast is set but does not take place, the status of that broadcast will remain as 'upcoming' in the `Live` column of the 'videoData' sheet. This is because the YouTube feed is not updated, and the script does not automatically update the status.
-
-### Special Note
-The `youtubeToDiscord.js` script uses Japanese for notification messages to Discord, comments, and debugging console.log statements. As the Japanese used is basic, please feel free to replace it with your preferred language as needed.
 
 ### Language Note
 The `youtubeToDiscord.js` script uses Japanese for notification messages to Discord, comments, and debugging console.log statements. As the Japanese used is basic, please feel free to replace it with your preferred language as needed.
