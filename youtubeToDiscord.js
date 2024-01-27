@@ -470,7 +470,22 @@ function postToDiscord(data, channelIcon) {
 
 // スクリプトの実行開始点
 function fetchUpdateAndNotify() {
-  // チャンネル情報の初期化やメイン処理の呼び出し
-  loadAndVerifyChannelData();
-  updateAllChannels();
+  var lock = LockService.getScriptLock();
+  try {
+    // ロックを取得しようとする。10秒でタイムアウトを設定。
+    if (lock.tryLock(10000)) {
+      console.log('スクリプトをロック中です。');
+      // チャンネル情報の初期化やメイン処理の呼び出し
+      loadAndVerifyChannelData();
+      updateAllChannels();
+    } else {
+      console.log('スクリプトは既に実行中です。');
+    }
+  } catch (e) {
+    console.error('エラーが発生しました: ' + e.message);
+  } finally {
+    // ロックを解放する
+    lock.releaseLock();
+    console.log('スクリプトをロックを解除しました。');
+  }
 }
