@@ -6,8 +6,36 @@ const youtubeNamespace = XmlService.getNamespace('yt', 'http://www.youtube.com/x
 const atom = XmlService.getNamespace('http://www.w3.org/2005/Atom');
 
 // 日付をフォーマットする関数
-function formatDate(dateString, format = 'YYYY/MM/DDTHH:mm:ss') {
-  return dateString ? dayjs.dayjs(dateString).format(format) : '';
+function formatDate(dateString, format = 'YYYY-MM-DDTHH:mm:ss') {
+  // 日付文字列の有効性をチェック
+  if (!dateString) {
+    console.error(`無効な日付 "${dateString}" がformatDate関数に渡されました。`);
+    return null; // 無効な入力に対してはnullを返す
+  }
+
+  // dayjsを使用して日付をフォーマット
+  const formattedDate = dayjs.dayjs(dateString);
+  if (!formattedDate.isValid()) {
+    console.error(`無効な日付文字列 "${dateString}" がformatDate関数に渡されました。`);
+    return null; // 無効な日付に対してはnullを返す
+  }
+
+  return formattedDate.format(format);
+}
+
+// ISO 8601形式の持続時間をHH:MM:SSに変換する関数
+function convertDurationToHHMMSS(duration) {
+  if (duration === "P0D") {
+    return "00:00:00";
+  }
+
+  const matches = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+  // 時間、分、秒の値を取得（存在しない場合は0とする）
+  const hours = (matches[1] ? parseInt(matches[1]) : 0);
+  const minutes = (matches[2] ? parseInt(matches[2]) : 0);
+  const seconds = (matches[3] ? parseInt(matches[3]) : 0);
+  // HH:MM:SS形式で結果を返す
+  return String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
 }
 
 // スプレッドシートから特定の範囲のデータを取得する関数
@@ -70,7 +98,7 @@ function updateChannelIcon(channelId) {
       }
     }
   } catch (e) {
-    console.log(`チャンネルID ${channelId} のアイコン更新中にエラーが発生しました: ${e.message}`);
+    console.error(`チャンネルID ${channelId} のアイコン更新中にエラーが発生しました: ${e.message}`);
   }
 }
 
@@ -103,7 +131,7 @@ function getChannelIcon(channelId) {
 }
 
 // Discordへの投稿テキストを生成する関数
-function description_text(apiLiveBroadcastContent, time, specialMessage = '') {
+function description_text(apiLiveBroadcastContent, time, convertedDuration, specialMessage = '') {
   if (specialMessage) {
     return specialMessage;
   }
@@ -115,9 +143,9 @@ function description_text(apiLiveBroadcastContent, time, specialMessage = '') {
       return formatDate(time, 'HH:mm') + 'から配信中！';
     case 'none':
     case 'archive':
-      return 'アーカイブはこちら';
+      return 'アーカイブはこちら\n配信時間 ' + convertedDuration;
     case 'video':
-      return '動画が投稿されました';
+      return '動画が投稿されました\n動画時間 ' + convertedDuration;
     default:
       return 'new content!';
   }
@@ -181,7 +209,7 @@ function processChannelFeed(channelName, channelId, channels, channelIcon) {
       const feedUpdated = formatDate(items[i].getChildText('updated', atom));
       const feedPublished = formatDate(items[i].getChildText('published', atom));
       const feedVideoId = items[i].getChildText('videoId', youtubeNamespace);
-      const [isNewVideo, liveBroadcastContent, scheduledStartTime, actualStartTime] = getVideoInfoFromSheet(globalSheetData, feedVideoId);
+      const [isNewVideo, liveBroadcastContent, scheduledStartTime, actualStartTime, convertedDuration] = getVideoInfoFromSheet(globalSheetData, feedVideoId);
   
       if (isNewVideo) {
         let formattedScheduledStartTime = scheduledStartTime ? formatDate(scheduledStartTime) : '';
@@ -196,14 +224,15 @@ function processChannelFeed(channelName, channelId, channels, channelIcon) {
           channel, 
           APILiveBroadcastContent, 
           formattedScheduledStartTime, 
-          formattedActualStartTime
+          formattedActualStartTime,
+          convertedDuration
         ]);
   
         postToDiscord({
           channel: channel,
           title: feedTitle,
           videoId: feedVideoId,
-          description_text: description_text(liveBroadcastContent, formattedActualStartTime || formattedScheduledStartTime)
+          description_text: description_text(liveBroadcastContent, formattedActualStartTime || formattedScheduledStartTime, convertedDuration)
         }, channelIcon);
       } else {
         let SheetLiveBroadcastContent = liveBroadcastContent;
@@ -250,8 +279,10 @@ function getVideoInfoFromSheet(sheetData, videoId) {
     var apiLiveBroadcastContent = videoInfo.liveBroadcastContent;
     var apiScheduledStartTime = videoInfo.scheduledStartTime;
     var apiActualStartTime = videoInfo.actualStartTime;
-
-    return [true, apiLiveBroadcastContent, apiScheduledStartTime, apiActualStartTime, false];
+    var apiDuration = convertDurationToHHMMSS(videoInfo.duration);
+    console.log(`動画時間` + apiDuration);
+    
+    return [true, apiLiveBroadcastContent, apiScheduledStartTime, apiActualStartTime, apiDuration, false];
   } else {
     // スプレッドシートから情報を取得
     const rowData = sheetData[index];
@@ -267,9 +298,9 @@ function getVideoInfoFromSheet(sheetData, videoId) {
 function fetchVideoInfo(videoId) {
   try{
     // YouTube APIを使用してビデオの詳細情報を取得
-    const videoApiResponse = YouTube.Videos.list('id, snippet, liveStreamingDetails',{
+    const videoApiResponse = YouTube.Videos.list('id, snippet, liveStreamingDetails, contentDetails', {
       id: videoId,
-      fields: 'items(id, snippet(liveBroadcastContent, title), liveStreamingDetails(scheduledStartTime, actualStartTime, actualEndTime))'
+      fields: 'items(id, snippet(liveBroadcastContent, title), liveStreamingDetails(scheduledStartTime, actualStartTime, actualEndTime), contentDetails(duration))'
     });
 
     if(!videoApiResponse || videoApiResponse.items.length === 0) {
@@ -294,16 +325,19 @@ function fetchVideoInfo(videoId) {
       liveBroadcastContent = 'video';
     }
 
+    let duration = apiVideoInfo.contentDetails.duration;
+
     return{
       liveBroadcastContent: liveBroadcastContent,
       title: apiVideoInfo.snippet.title,
       scheduledStartTime: 'liveStreamingDetails' in apiVideoInfo ? apiVideoInfo.liveStreamingDetails.scheduledStartTime : false,
       actualStartTime: 'liveStreamingDetails' in apiVideoInfo && 'actualStartTime' in apiVideoInfo.liveStreamingDetails ? apiVideoInfo.liveStreamingDetails.actualStartTime : false,
-      actualEndTime: 'liveStreamingDetails' in apiVideoInfo && 'actualEndTime' in apiVideoInfo.liveStreamingDetails ? apiVideoInfo.liveStreamingDetails.actualEndTime : false
+      actualEndTime: 'liveStreamingDetails' in apiVideoInfo && 'actualEndTime' in apiVideoInfo.liveStreamingDetails ? apiVideoInfo.liveStreamingDetails.actualEndTime : false,
+      duration: duration
     };
   } catch(error) {
     // API呼び出し中にエラーが発生した場合、コンソールにエラー情報を出力
-    console.log(`fetchVideoInfoでエラーが発生しました - ビデオID: ${videoId}, エラーメッセージ: ${error.message}`);
+    console.error(`fetchVideoInfoでエラーが発生しました - ビデオID: ${videoId}, エラーメッセージ: ${error.message}`);
 
     // フォールバック処理: デフォルトのビデオ情報を返す
     return{
@@ -311,14 +345,14 @@ function fetchVideoInfo(videoId) {
       title: false,
       scheduledStartTime: false,
       actualStartTime: false,
-      actualEndTime: false
+      actualEndTime: false,
+      duration: false
     };
   }
 }
 
-
 // スプレッドシートに最新のビデオ情報を更新する関数
-function updateVideoInfoInSheet(title, feedPublished, feedUpdated, videoId, apiLiveBroadcastContent, scheduledStartTime, actualStartTime) {
+function updateVideoInfoInSheet(title, feedPublished, feedUpdated, videoId, apiLiveBroadcastContent, scheduledStartTime, actualStartTime, apiDuration) {
   const videoDataSheet = spreadsheet.getSheetByName(videoDataSheetName);
   const lr = videoDataSheet.getLastRow();
   const videoIdColumnData = getSpreadsheetData(videoDataSheet, `D1:D${lr}`);
@@ -336,6 +370,7 @@ function updateVideoInfoInSheet(title, feedPublished, feedUpdated, videoId, apiL
   videoDataSheet.getRange(rowIndex, 6).setValue(apiLiveBroadcastContent);
   videoDataSheet.getRange(rowIndex, 7).setValue(formattedScheduledStartTime);
   videoDataSheet.getRange(rowIndex, 8).setValue(formattedActualStartTime);
+  videoDataSheet.getRange(rowIndex, 9).setValue(apiDuration);
 }
 
 // ビデオ情報の更新を確認し、必要に応じてDiscordに投稿する関数
@@ -362,26 +397,31 @@ function updateChecker(data, channelIcon) {
         const apiScheduledStartTime = formatDate(apiVideoInfo.scheduledStartTime);
         const apiActualStartTime = formatDate(apiVideoInfo.actualStartTime);
         const apiTitle = apiVideoInfo.title;
-        
+        const apiDuration = convertDurationToHHMMSS(apiVideoInfo.duration);
+
+        console.log(`動画時間` + apiDuration);
+
         let description;
         let isChanged = false; 
 
         if (sheetLiveBroadcastContent != apiLiveBroadcastContent) {
-          description = description_text(apiLiveBroadcastContent, apiActualStartTime);
+          description = description_text(apiLiveBroadcastContent, apiActualStartTime, apiDuration);
           console.log(`Live状態が${sheetLiveBroadcastContent}から${apiLiveBroadcastContent}に変更されました。`);
           isChanged = true;
+        
         } else if (apiLiveBroadcastContent == 'upcoming' && formattedSheetScheduledStartTime !== apiScheduledStartTime) {
-          description = description_text(apiLiveBroadcastContent, apiActualStartTime, `配信予定が${formatDate(apiScheduledStartTime, 'MM/DD HH:mm')}に変更されました。`);
+          description = description_text(apiLiveBroadcastContent, apiActualStartTime, apiDuration, `配信予定が${formatDate(apiScheduledStartTime, 'MM/DD HH:mm')}に変更されました。`);
           console.log(`配信予定が${formattedSheetScheduledStartTime}から${apiScheduledStartTime}に変更されました。`);
           isChanged = true;
+        
         } else if (sheetTitle !== apiTitle) {
-          description = description_text(apiLiveBroadcastContent, apiActualStartTime, `配信タイトルが${apiTitle}に更新されました。`);
+          description = description_text(apiLiveBroadcastContent, apiActualStartTime, apiDuration, `配信タイトルが${apiTitle}に更新されました。`);
           console.log(`配信タイトルが${sheetTitle}から、${apiTitle}に変更されました。`);
           isChanged = true;
         }
 
         // 最新の情報をスプレッドシートのビデオ情報を常に更新
-        updateVideoInfoInSheet(apiTitle, feedPublished, feedUpdated, feedVideoId, apiLiveBroadcastContent, apiScheduledStartTime, apiActualStartTime);
+        updateVideoInfoInSheet(apiTitle, feedPublished, feedUpdated, feedVideoId, apiLiveBroadcastContent, apiScheduledStartTime, apiActualStartTime, apiDuration);
 
         if (isChanged) {
           // 変更がある場合の処理
@@ -424,13 +464,13 @@ function postToDiscord(data, channelIcon) {
   try{
     UrlFetchApp.fetch(discordWebhookUrl, options)
   } catch(e) {
-    console.log(`エラーが発生しました - 関数名: ${e.functionName}, エラーメッセージ: ${e.message}`);
+    console.error(`エラーが発生しました - 関数名: ${e.functionName}, エラーメッセージ: ${e.message}`);
   }
 }
 
 // スクリプトの実行開始点
 function fetchUpdateAndNotify() {
-    // チャンネル情報の初期化やメイン処理の呼び出し
-    loadAndVerifyChannelData();
-    updateAllChannels();
+  // チャンネル情報の初期化やメイン処理の呼び出し
+  loadAndVerifyChannelData();
+  updateAllChannels();
 }

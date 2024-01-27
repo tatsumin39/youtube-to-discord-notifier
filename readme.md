@@ -21,7 +21,7 @@ English follows Japanese.
 ### Googleスプレッドシートの準備
 1. 新しいGoogleスプレッドシートを作成し、「channels」と「videoData」の2つのシートを準備します。
    - 「channels」シートで見出し行として、`CHANNEL_NAME`、`CHANNEL_ID`、`CHANNEL_ICON_URL`を設定します。
-   - 「videoData」シートで見出し行として、`title`、`published`、`updated`、`videoId`、`channel`、`live`、`scheduledStartTime`、`actualStartTime`を設定します。
+   - 「videoData」シートで見出し行として、`title`、`published`、`updated`、`videoId`、`channel`、`live`、`scheduledStartTime`、`actualStartTime`、`duration`を設定します。
 
 ### Google Apps Scriptのセットアップ
 1. スプレッドシートの「拡張機能」メニューから「Apps Script」を選択します。
@@ -76,7 +76,7 @@ This Google Apps Script (GAS) allows you to notify a Discord channel about new v
 #### Preparing Google Spreadsheet
 1. Create a new Google Spreadsheet and prepare two sheets: 'channels' and 'videoData'.
    - In the 'channels' sheet, set the header row with `CHANNEL_NAME`, `CHANNEL_ID`, `CHANNEL_ICON_URL`.
-   - In the 'videoData' sheet, set the header row with `title`, `published`, `updated`, `videoId`, `channel`, `live`, `scheduledStartTime`, `actualStartTime`.
+   - In the 'videoData' sheet, set the header row with `title`, `published`, `updated`, `videoId`, `channel`, `live`, `scheduledStartTime`, `actualStartTime`, `duration`.
 
 ### Google Apps Script Setup
 1. From the 'Extensions' menu in the spreadsheet, select 'Apps Script'.
