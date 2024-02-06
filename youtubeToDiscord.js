@@ -462,6 +462,7 @@ function postToDiscord(data, channelIcon, discordChannelId) {
     avatar_url: channelIcon || "https://www.youtube.com/s/desktop/28b0985e/img/favicon_144x144.png",
     tts: false,
     title: data.title,
+    wait: true,
     content: `[${data.description_text}](${youtube_url}${data.videoId})`,
   }
   var options = {
