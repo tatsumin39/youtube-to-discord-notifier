@@ -23,7 +23,7 @@ English follows Japanese.
 ## 使い方
 ### Discord Webhookの設定
 1. Discordで、通知を送信したいチャンネルを選択します。
-2. チャンネルの設定（歯車アイコン）を開き、「統合」タブを選択します。
+2. チャンネルの設定（歯車アイコン）を開き、「連携サービス」を選択します。
 3. 「Webhooks」セクションで「新しいWebhook」をクリックします。
 4. Webhookの名前を設定し、「Webhook URL」をコピーします。
 
